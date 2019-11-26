@@ -40,9 +40,11 @@
 // ============================================
 #define DEBUG
 #ifdef DEBUG
+  // Macros for debug output
   #define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
   #define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
 #else
+  // can also be used when DEBUG is disabled
   #define DEBUG_PRINT(...)
   #define DEBUG_PRINTLN(...)
 #endif
@@ -56,12 +58,14 @@
   hw_timer_t *WDTimer = NULL;
   // WDT will trigger every 10 seconds
   #define WDTIMEOUT 10
+  // Macro call to reset WD timer in sketch
   #define RESET_WATCHDOG timerWrite(WDTimer, 0)
+  // WD may be overriden (i.e. OTA Update)
+  bool OverrideWD = false;
 #else
+  // empty macro when WD disabled
   #define RESET_WATCHDOG
 #endif
-// WD may be overriden (i.e. OTA Update)
-bool OverrideWD = false;
 
 
 // Builtin LED on 2 (LED inverted!)
@@ -385,8 +389,9 @@ void setup() {
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
     int percentComplete = (progress / (total / 100));
-    if (percentComplete = 100) {
+    if (percentComplete == 100) {
       mqttClt.publish(otaStatus_topic, String("upload_complete").c_str(), true);
+      delay(500);
     }
   });
   ArduinoOTA.onError([](ota_error_t error) {
@@ -403,7 +408,7 @@ void setup() {
     } else if (error == OTA_END_ERROR) {
       mqttClt.publish(otaStatus_topic, String("End_Error").c_str(), true);
     }
-    delay(300);
+    delay(500);
   });
   ArduinoOTA.begin();
 
@@ -472,7 +477,9 @@ void loop() {
       SentOtaIPtrue = false;
       SentUpdateRequested = false;
       RESET_WATCHDOG; // Reset WD Timer
-      OverrideWD = false;    
+      #ifdef ENABLEWATCHDOG
+      OverrideWD = false;  
+      #endif  
       return;
     }
     if (!SentUpdateRequested) {
@@ -480,7 +487,9 @@ void loop() {
       SentUpdateRequested = true;
     }
     // Override watchdog during OTA update
+    #ifdef ENABLEWATCHDOG
     OverrideWD = true;
+    #endif
     DEBUG_PRINTLN("OTA firmware update requested, waiting for upload..");
     #ifdef USELED
     // Signal OTA update requested
@@ -508,7 +517,9 @@ void loop() {
       SentOtaIPtrue = false;
       SentUpdateRequested = false;
       RESET_WATCHDOG; // Reset WD Timer
+      #ifdef ENABLEWATCHDOG
       OverrideWD = false;
+      #endif
     }
   }
 
